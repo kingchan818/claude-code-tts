@@ -35,3 +35,22 @@ export function parseSpeed(word: string): number | undefined {
   const n = Number(match[1])
   return n >= 0.5 && n <= 3 ? n : undefined
 }
+
+// Splits speech into small pieces, so the first one comes back fast and
+// plays while the next ones are still being made.
+export function toChunks(text: string, firstMax = 200, max = 600): string[] {
+  const sentences = text.split(/(?<=[.!?:])\s+|\n+/).map(t => t.trim()).filter(t => t !== '')
+  const chunks: string[] = []
+  let current = ''
+  for (const sentence of sentences) {
+    const limit = chunks.length === 0 ? firstMax : max
+    if (current !== '' && current.length + 1 + sentence.length > limit) {
+      chunks.push(current)
+      current = sentence
+    } else {
+      current = current === '' ? sentence : `${current} ${sentence}`
+    }
+  }
+  if (current !== '') chunks.push(current)
+  return chunks
+}

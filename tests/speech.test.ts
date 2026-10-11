@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { parseSpeed, toSpeech } from '../hooks/speech'
+import { parseSpeed, toChunks as chunk, toSpeech } from '../hooks/speech'
 
 describe('toSpeech', () => {
   test('drops code blocks, links, markdown marks and emoji', async () => {
@@ -39,5 +39,15 @@ describe('parseSpeed', () => {
     expect(parseSpeed('1.2x')).toBe(1.2)
     expect(parseSpeed('5')).toBeUndefined()
     expect(parseSpeed('fast')).toBeUndefined()
+  })
+})
+
+describe('toChunks', () => {
+  test('keeps the first piece short and never loses words', async () => {
+    const { toChunks } = await Promise.resolve({ toChunks: chunk })
+    const text = 'One. '.repeat(100).trim()
+    const chunks = toChunks(text)
+    expect(chunks[0]!.length).toBeLessThanOrEqual(200)
+    expect(chunks.join(' ')).toBe(text)
   })
 })

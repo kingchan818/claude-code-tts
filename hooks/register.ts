@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { parseSpeed, toSpeech } from './speech'
+import { parseSpeed, toChunks, toSpeech } from './speech'
 
 const MODEL = 'elevenlabs/eleven-v4-turbo'
 const VOICES = [
@@ -39,17 +39,17 @@ async function speak($: EngineInterface, text: string): Promise<void> {
   await stopSpeaking($)
   const voice = String((await $.store.get('voice')) ?? 'george')
   const speed = await getSpeed($)
-  const body = JSON.stringify({ model: MODEL, input: text, voice, response_format: 'mp3' })
+  const bodies = toChunks(text).map(input => JSON.stringify({ model: MODEL, input, voice, response_format: 'mp3' }))
   await $.process.run([
     '/bin/sh',
     '-c',
-    '"$1" "$2" "$3" "$4" "$5" >/dev/null 2>&1 &',
+    '"$@" >/dev/null 2>&1 &',
     'speak',
     `${$.plugin.root}/hooks/speak.sh`,
     String(speed),
     String(Math.round(175 * speed)), // macOS say: words per minute
-    body,
     text,
+    ...bodies,
   ])
 }
 
