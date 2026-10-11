@@ -1,10 +1,11 @@
 #!/bin/sh
-# usage: speak.sh RATE BODY_JSON TEXT
+# usage: speak.sh SPEED SAY_WPM BODY_JSON TEXT
 # Plays the reply with ElevenLabs (via OpenRouter) when a key is saved,
 # otherwise falls back to the built-in macOS `say` voice.
-rate=$1
-body=$2
-text=$3
+speed=$1
+wpm=$2
+body=$3
+text=$4
 keyfile="$HOME/.config/read-aloud/openrouter_key"
 
 if [ -s "$keyfile" ]; then
@@ -17,11 +18,11 @@ if [ -s "$keyfile" ]; then
       --data-binary "$body" \
       -o "$out" \
       https://openrouter.ai/api/v1/audio/speech; then
-    afplay "$out"
+    afplay -r "$speed" -q 1 "$out"
     rm -f "$out"
     exit 0
   fi
   rm -f "$out"
 fi
 
-exec say -r "$rate" -- "$text"
+exec say -r "$wpm" -- "$text"

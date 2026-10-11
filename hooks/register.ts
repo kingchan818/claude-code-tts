@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { toSpeech } from './speech'
+import { parseSpeed, toSpeech } from './speech'
 
 const MODEL = 'elevenlabs/eleven-v4-turbo'
 const VOICES = [
@@ -14,7 +14,7 @@ const HELP = [
   '/speak stop       stop the current reading',
   '/speak again      read the last reply again',
   '/speak voice NAME ElevenLabs voice (george, sarah, lily, ...)',
-  '/speak rate N     macOS fallback speed, words per minute (default 175)',
+  '/speak 1.4        speed from 0.5 to 3 (default 1)',
 ].join('\n')
 
 let lastReply = ''
@@ -29,20 +29,25 @@ async function stopSpeaking($: EngineInterface): Promise<void> {
   await $.process.run(['pkill', '-x', 'say']).catch(() => undefined)
 }
 
+async function getSpeed($: EngineInterface): Promise<number> {
+  return Number((await $.store.get('speed')) ?? 1)
+}
+
 // Starts the speak script in the background so the hook returns at once.
 async function speak($: EngineInterface, text: string): Promise<void> {
   if (text === '') return
   await stopSpeaking($)
   const voice = String((await $.store.get('voice')) ?? 'george')
-  const rate = String((await $.store.get('rate')) ?? 175)
+  const speed = await getSpeed($)
   const body = JSON.stringify({ model: MODEL, input: text, voice, response_format: 'mp3' })
   await $.process.run([
     '/bin/sh',
     '-c',
-    '"$1" "$2" "$3" "$4" >/dev/null 2>&1 &',
+    '"$1" "$2" "$3" "$4" "$5" >/dev/null 2>&1 &',
     'speak',
     `${$.plugin.root}/hooks/speak.sh`,
-    rate,
+    String(speed),
+    String(Math.round(175 * speed)), // macOS say: words per minute
     body,
     text,
   ])
@@ -52,7 +57,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'speak',
-      description: 'Read Claude replies aloud: on, off, stop, again, voice NAME, rate N',
+      description: 'Read Claude replies aloud: on, off, stop, again, voice NAME, 1.4',
     })
     return next(e)
   })
@@ -99,14 +104,20 @@ export const register: Register = on => {
         if (!VOICES.includes(value)) return { text: `Pick one of: ${VOICES.join(', ')}` }
         await $.store.set('voice', value)
         return { text: `Voice set to ${value}.` }
-      case 'rate': {
-        const n = Number(value)
-        if (!Number.isInteger(n) || n < 80 || n > 400) return { text: 'Use a number from 80 to 400, e.g. /speak rate 160' }
-        await $.store.set('rate', n)
-        return { text: `Fallback speed set to ${n} words per minute.` }
+      case 'speed': {
+        if (value === '') return { text: `Speed is ${await getSpeed($)}x. Try /speak 1.4` }
+        const n = parseSpeed(value)
+        if (n === undefined) return { text: 'Use a speed from 0.5 to 3, e.g. /speak 1.4' }
+        await $.store.set('speed', n)
+        return { text: `Speed set to ${n}x.` }
       }
-      default:
-        return { text: HELP }
+      default: {
+        // `/speak 1.4` is a shortcut for `/speak speed 1.4`
+        const n = parseSpeed(word)
+        if (n === undefined) return { text: HELP }
+        await $.store.set('speed', n)
+        return { text: `Speed set to ${n}x.` }
+      }
     }
   })
 }

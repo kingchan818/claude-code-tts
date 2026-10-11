@@ -27,3 +27,11 @@ export function toSpeech(markdown: string, maxChars = 4000): string {
   }
   return text
 }
+
+// Accepts 1.4, 1.4x or x1.4; undefined when it is not a speed.
+export function parseSpeed(word: string): number | undefined {
+  const match = /^x?(\d+(?:\.\d+)?)x?$/.exec(word)
+  if (match === null) return undefined
+  const n = Number(match[1])
+  return n >= 0.5 && n <= 3 ? n : undefined
+}

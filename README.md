@@ -43,7 +43,7 @@ ElevenLabs bills per character; replies are cut at about 4,000 characters.
 | `/speak stop` | Stop the current reading |
 | `/speak again` | Read the last reply again |
 | `/speak voice NAME` | ElevenLabs voice: george (default), sarah, adam, alice, bella, bill, brian, callum, charlie, chris, daniel, eric, harry, jessica, laura, liam, lily, matilda, river, roger, will |
-| `/speak rate N` | Speed of the macOS fallback voice, words per minute (default 175) |
+| `/speak 1.4` | Speed, from `0.5` to `3` (default `1`). `/speak speed` shows the current one |
 
 ## Requirements
 
