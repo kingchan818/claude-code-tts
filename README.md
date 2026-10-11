@@ -8,6 +8,8 @@
 - Falls back to the built-in macOS `say` voice when there is no key, or when the request fails.
 - Skips code blocks, links, markdown symbols, tables and emoji, so it sounds natural.
 - Stops talking as soon as you send a new message.
+- Shows a small bar above the prompt while it works (`🔊 Preparing voice…`, `🔊 Speaking 2 of 3`) with a **Stop** button.
+- Speaks in pieces, so the first words start in a few seconds even for long replies.
 
 Made for people who prefer listening to reading, for example learners with dyslexia.
 
@@ -47,8 +49,9 @@ ElevenLabs bills per character; replies are cut at about 4,000 characters.
 
 ## Requirements
 
-- macOS (`say`, `afplay`, `curl`)
-- Claude Code with function-hook plugins
+- **Claude Code 2.1.296 or newer.** It uses function-hook plugins, an early-access API that may change between releases. Check yours with `claude --version`, and update with `claude update`.
+- macOS (`say`, `afplay`, `curl`, `bash`)
+- Optional: an [OpenRouter](https://openrouter.ai) API key for ElevenLabs voices
 
 ## Develop
 

@@ -1,5 +1,13 @@
 {
   "name": "read-aloud",
-  "owner": { "name": "kingchan818" },
-  "plugins": [{ "name": "read-aloud", "source": "./" }]
+  "owner": {
+    "name": "kingchan818"
+  },
+  "plugins": [
+    {
+      "name": "read-aloud",
+      "source": "./"
+    }
+  ],
+  "description": "Text-to-speech for Claude Code: hear Claude's replies read aloud."
 }

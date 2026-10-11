@@ -1,4 +1,5 @@
-import type { EngineInterface, Register } from 'claude-code'
+import { atom, read, update } from 'claude-code'
+import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import { parseSpeed, toChunks, toSpeech } from './speech'
 
@@ -17,7 +18,29 @@ const HELP = [
   '/speak 1.4        speed from 0.5 to 3 (default 1)',
 ].join('\n')
 
+// The speak script writes its progress here; the band above the prompt shows it.
+const STATUS_FILE = '/tmp/read-aloud.status'
+const status = atom({ plugin: 'read-aloud', key: 'status' } as const, '')
+
 let lastReply = ''
+let poll: Timer | undefined
+
+// Copies the script's progress into the band until it goes idle.
+function watchStatus($: EngineInterface): void {
+  poll?.cancel()
+  poll = $.clock.every(300, () => {
+    void (async () => {
+      const text = (await $.fs.read(STATUS_FILE).catch(() => '')).trim()
+      if (text !== (await read($, status))) await update($, status, () => text)
+      if (text === '' && (await $.clock.now()) - startedAt > 3000) {
+        poll?.cancel()
+        poll = undefined
+      }
+    })()
+  })
+}
+
+let startedAt = 0
 
 async function isEnabled($: EngineInterface): Promise<boolean> {
   return ((await $.store.get('enabled')) ?? true) === true
@@ -27,6 +50,8 @@ async function stopSpeaking($: EngineInterface): Promise<void> {
   await $.process.run(['pkill', '-f', `${$.plugin.root}/hooks/speak.sh`]).catch(() => undefined)
   await $.process.run(['pkill', '-x', 'afplay']).catch(() => undefined)
   await $.process.run(['pkill', '-x', 'say']).catch(() => undefined)
+  await $.fs.write(STATUS_FILE, '').catch(() => undefined)
+  await update($, status, () => '')
 }
 
 async function getSpeed($: EngineInterface): Promise<number> {
@@ -46,11 +71,14 @@ async function speak($: EngineInterface, text: string): Promise<void> {
     '"$@" >/dev/null 2>&1 &',
     'speak',
     `${$.plugin.root}/hooks/speak.sh`,
+    STATUS_FILE,
     String(speed),
     String(Math.round(175 * speed)), // macOS say: words per minute
     text,
     ...bodies,
   ])
+  startedAt = await $.clock.now()
+  watchStatus($)
 }
 
 export const register: Register = on => {
@@ -77,6 +105,20 @@ export const register: Register = on => {
     await stopSpeaking($)
     return next(e)
   }).catch(($, e, next) => next(e)) // never block a prompt
+
+  // A small bar above the prompt while the voice is preparing or speaking.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const text = await read($, status)
+    if (text === '' || e.props.hasSurvey) return next(e)
+
+    const { Box, Button, Text } = $.ui.resolve(e)
+    return (
+      <Box>
+        <Text color="cyan">🔊 {text} </Text>
+        <Button key="stop" label="Stop" onPress={() => stopSpeaking($)} />
+      </Box>
+    )
+  })
 
   on('command.run', { command: 'speak' }, async ($, e) => {
     const [word = '', value = ''] = e.args.trim().toLowerCase().split(/\s+/)

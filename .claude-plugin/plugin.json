@@ -1,7 +1,11 @@
 {
   "name": "read-aloud",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Reads Claude's replies out loud on macOS with ElevenLabs (via OpenRouter) or the built-in say voice. /speak to control it.",
-  "author": { "name": "kingchan818", "url": "https://github.com/kingchan818" },
-  "license": "MIT"
+  "author": {
+    "name": "kingchan818",
+    "url": "https://github.com/kingchan818"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
 }
