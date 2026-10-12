@@ -6,9 +6,9 @@
 
 - Uses **ElevenLabs `eleven-v4-turbo`** through [OpenRouter](https://openrouter.ai/elevenlabs/eleven-v4-turbo) when you save a key.
 - Falls back to the built-in macOS `say` voice when there is no key, or when the request fails.
-- Skips code blocks, links, markdown symbols, tables and emoji, so it sounds natural.
+- Skips code blocks, shell commands, links, markdown symbols, tables (pipe or box-drawing) and emoji, so it sounds natural. A skipped table or code block is spoken as just "table" or "code block".
 - Stops talking as soon as you send a new message.
-- Shows a small bar above the prompt while it works (`🔊 Preparing voice…`, `🔊 Speaking 2 of 3`) with a **Stop** button.
+- Shows a small bar above the prompt while it works (`🔊 Preparing voice…`, `🔊 Speaking 2 of 3`) with **Stop**, **Play again** (stays after the reply is read) and **−** / **+** speed buttons, which take effect from the next piece.
 - Speaks in pieces, so the first words start in a few seconds even for long replies.
 
 Made for people who prefer listening to reading, for example learners with dyslexia.
