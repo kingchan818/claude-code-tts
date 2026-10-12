@@ -4,6 +4,7 @@
 # piece at a time: piece N plays while piece N+1 is fetched. Falls back to
 # the built-in macOS `say` voice when there is no key or the first piece fails.
 statusfile=$1
+speedfile="$statusfile.speed" # the panel's +/- buttons write the speed here
 speed=$2
 wpm=$3
 text=$4
@@ -51,8 +52,10 @@ for ((i = 0; i < ${#bodies[@]}; i++)); do
     fetch "$next" &
     pid=$!
   fi
-  note "playing piece $i"
-  status "Speaking $((i + 1)) of $n at ${speed}x"
+  speed=$(tr -d '[:space:]' < "$speedfile" 2>/dev/null)
+  speed=${speed:-$2}
+  note "playing piece $i at ${speed}x"
+  status "Speaking $((i + 1)) of $n"
   afplay -r "$speed" -q 1 "$dir/$i.mp3" || { note "afplay stopped: $?"; exit 0; }
 done
 note "done"

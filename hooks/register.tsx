@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import { parseSpeed, toChunks, toSpeech } from './speech'
+import { parseSpeed, stepSpeed, toChunks, toSpeech } from './speech'
 
 const MODEL = 'elevenlabs/eleven-v4-turbo'
 const VOICES = [
@@ -20,7 +20,11 @@ const HELP = [
 
 // The speak script writes its progress here; the band above the prompt shows it.
 const STATUS_FILE = '/tmp/read-aloud.status'
+const SPEED_FILE = `${STATUS_FILE}.speed` // speak.sh reads it before each piece
 const status = atom({ plugin: 'read-aloud', key: 'status' } as const, '')
+// True once there is a reply to play again; lets the band show its button when idle.
+const speedAtom = atom({ plugin: 'read-aloud', key: 'speed' } as const, 1)
+const hasReply = atom({ plugin: 'read-aloud', key: 'hasReply' } as const, false)
 
 let lastReply = ''
 let poll: Timer | undefined
@@ -58,12 +62,20 @@ async function getSpeed($: EngineInterface): Promise<number> {
   return Number((await $.store.get('speed')) ?? 1)
 }
 
+// Saves the speed; a reading in progress picks it up from the next piece.
+async function setSpeed($: EngineInterface, n: number): Promise<void> {
+  await $.store.set('speed', n)
+  await $.fs.write(SPEED_FILE, String(n)).catch(() => undefined)
+  await update($, speedAtom, () => n)
+}
+
 // Starts the speak script in the background so the hook returns at once.
 async function speak($: EngineInterface, text: string): Promise<void> {
   if (text === '') return
   await stopSpeaking($)
   const voice = String((await $.store.get('voice')) ?? 'george')
   const speed = await getSpeed($)
+  await $.fs.write(SPEED_FILE, String(speed)).catch(() => undefined)
   const bodies = toChunks(text).map(input => JSON.stringify({ model: MODEL, input, voice, response_format: 'mp3' }))
   await $.process.run([
     '/bin/sh',
@@ -87,6 +99,8 @@ export const register: Register = on => {
       name: 'speak',
       description: 'Read Claude replies aloud: on, off, stop, again, voice NAME, 1.4',
     })
+    const saved = await getSpeed($)
+    await update($, speedAtom, () => saved)
     return next(e)
   })
 
@@ -94,6 +108,7 @@ export const register: Register = on => {
     const done = await next(e)
     if (e.agentId !== undefined || e.isAborted) return done // main replies only
     lastReply = e.answer
+    await update($, hasReply, () => true)
     if (await isEnabled($)) {
       await speak($, toSpeech(e.answer)).catch(err => $.ui.log(`speak failed: ${err}`, { to: 'debug' }))
     }
@@ -106,16 +121,23 @@ export const register: Register = on => {
     return next(e)
   }).catch(($, e, next) => next(e)) // never block a prompt
 
-  // A small bar above the prompt while the voice is preparing or speaking.
+  // A small bar above the prompt: Stop while the voice works, Play again once it is idle.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const text = await read($, status)
-    if (text === '' || e.props.hasSurvey) return next(e)
+    const canReplay = await read($, hasReply)
+    const speed = await read($, speedAtom)
+    if ((text === '' && !canReplay) || e.props.hasSurvey) return next(e)
 
     const { Box, Button, Text } = $.ui.resolve(e)
     return (
       <Box>
-        <Text color="cyan">🔊 {text} </Text>
-        <Button key="stop" label="Stop" onPress={() => stopSpeaking($)} />
+        <Text color="cyan">🔊 {text === '' ? 'Read aloud' : text} </Text>
+        {text !== '' && <Button key="stop" label="Stop" onPress={() => stopSpeaking($)} />}
+        {canReplay && <Button key="again" label="Play again" onPress={() => speak($, toSpeech(lastReply))} />}
+        <Text color="cyan"> </Text>
+        <Button key="slower" label="−" onPress={async () => setSpeed($, stepSpeed(await getSpeed($), -0.25))} />
+        <Text color="cyan"> {speed}x </Text>
+        <Button key="faster" label="+" onPress={async () => setSpeed($, stepSpeed(await getSpeed($), 0.25))} />
       </Box>
     )
   })
@@ -150,14 +172,14 @@ export const register: Register = on => {
         if (value === '') return { text: `Speed is ${await getSpeed($)}x. Try /speak 1.4` }
         const n = parseSpeed(value)
         if (n === undefined) return { text: 'Use a speed from 0.5 to 3, e.g. /speak 1.4' }
-        await $.store.set('speed', n)
+        await setSpeed($, n)
         return { text: `Speed set to ${n}x.` }
       }
       default: {
         // `/speak 1.4` is a shortcut for `/speak speed 1.4`
         const n = parseSpeed(word)
         if (n === undefined) return { text: HELP }
-        await $.store.set('speed', n)
+        await setSpeed($, n)
         return { text: `Speed set to ${n}x.` }
       }
     }
